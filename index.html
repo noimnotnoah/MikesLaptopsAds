@@ -63,14 +63,9 @@
     #hud {
       position: fixed;
       left: 16px;
-      right: 16px;
       top: 16px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-      pointer-events: none;
       z-index: 20;
+      pointer-events: none;
     }
 
     .status-pill {
@@ -101,14 +96,6 @@
     .status-pill.local .status-dot { background: var(--warn); color: var(--warn); }
     .status-pill.offline .status-dot { background: var(--danger); color: var(--danger); }
 
-    #hudRight {
-      display: flex;
-      gap: 10px;
-      align-items: flex-start;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
     .hud-chip {
       padding: 10px 12px;
       border-radius: 12px;
@@ -122,23 +109,6 @@
     }
 
     .hud-chip strong { color: var(--text); font-weight: 600; }
-
-    #settingsButton {
-      appearance: none;
-      border: 1px solid rgba(82, 255, 168, 0.35);
-      background: linear-gradient(180deg, rgba(82, 255, 168, 0.22), rgba(82, 255, 168, 0.1));
-      color: #d9ffef;
-      border-radius: 999px;
-      padding: 10px 14px;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 12px;
-      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
-      pointer-events: auto;
-    }
-
-    #settingsButton:hover { transform: translateY(-1px); border-color: rgba(82, 255, 168, 0.7); }
-    #settingsButton:active { transform: translateY(0); }
 
     #panelBackdrop {
       position: fixed;
@@ -413,8 +383,7 @@
       .grid, .stats-grid { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
       .value { text-align: left; width: auto; }
-      #hud { flex-direction: column; align-items: stretch; }
-      #hudRight { justify-content: flex-start; }
+      #hud { left: 12px; top: 12px; right: 12px; }
     }
   </style>
 </head>
@@ -427,12 +396,6 @@
       <div id="syncBadge" class="status-pill local">
         <span class="status-dot"></span>
         <span id="syncText">Syncing clock…</span>
-      </div>
-
-      <div id="hudRight">
-        <div class="hud-chip"><strong id="slideLabel">1 / 3</strong> <span id="slideName">Loading…</span></div>
-        <div class="hud-chip"><strong id="clockLabel">--:--:--</strong> <span id="nextChangeLabel">next change in --</span></div>
-        <button id="settingsButton" type="button">Display settings</button>
       </div>
     </div>
   </main>
@@ -563,7 +526,7 @@
       </section>
     </div>
 
-    <div id="footerHint">Shortcuts: Ctrl+Shift+A open/close panel, Esc close, arrows change slides, Space pause/resume, F fullscreen.</div>
+    <div id="footerHint">Shortcuts: type 123 to open the panel, Esc close, arrows change slides, Space pause/resume, F fullscreen.</div>
   </aside>
 
   <input class="hidden-file" id="importFile" type="file" accept="application/json" />
@@ -600,10 +563,6 @@
       slideB: document.getElementById('slideB'),
       syncBadge: document.getElementById('syncBadge'),
       syncText: document.getElementById('syncText'),
-      slideLabel: document.getElementById('slideLabel'),
-      slideName: document.getElementById('slideName'),
-      clockLabel: document.getElementById('clockLabel'),
-      nextChangeLabel: document.getElementById('nextChangeLabel'),
       nextUpdateLabel: document.getElementById('nextUpdateLabel'),
       offsetLabel: document.getElementById('offsetLabel'),
       clockSource: document.getElementById('clockSource'),
@@ -627,12 +586,12 @@
       statErrors: document.getElementById('statErrors'),
       panel: document.getElementById('controlPanel'),
       backdrop: document.getElementById('panelBackdrop'),
-      settingsButton: document.getElementById('settingsButton')
     };
 
     const imageCache = new Map();
     let tickTimer = null;
     let syncTimer = null;
+    let unlockSequence = '';
 
     function log(message) {
       const entry = `[${new Date().toLocaleTimeString()}] ${message}`;
@@ -816,12 +775,6 @@
       const idx = activeIndex(now);
       const nextChangeAt = Math.ceil(now / state.durationMs) * state.durationMs;
       const secondsLeft = Math.max(0, Math.ceil((nextChangeAt - now) / 1000));
-      const slideName = state.playlist[idx] ? state.playlist[idx].split('/').pop() : 'Unknown';
-
-      els.slideLabel.textContent = `${idx + 1} / ${state.playlist.length}`;
-      els.slideName.textContent = slideName;
-      els.clockLabel.textContent = new Date(now).toLocaleTimeString();
-      els.nextChangeLabel.textContent = state.paused ? 'paused' : `next change in ${secondsLeft}s`;
       els.nextUpdateLabel.textContent = state.paused ? 'paused' : new Date(nextChangeAt).toLocaleTimeString();
       els.offsetLabel.textContent = `${Math.round(state.serverOffsetMs)} ms`;
       els.clockSource.textContent = state.syncSource === 'server' ? 'Server time' : 'Local fallback';
@@ -1136,6 +1089,7 @@
     }
 
     function openPanel() {
+      unlockSequence = '';
       els.panel.classList.add('open');
       els.backdrop.classList.add('open');
       els.panel.setAttribute('aria-hidden', 'false');
@@ -1149,6 +1103,7 @@
       els.backdrop.classList.remove('open');
       els.panel.setAttribute('aria-hidden', 'true');
       els.backdrop.setAttribute('aria-hidden', 'true');
+      unlockSequence = '';
     }
 
     function rebuildPanel() {
@@ -1171,7 +1126,6 @@
     }
 
     function bindEvents() {
-      els.settingsButton.addEventListener('click', openPanel);
       document.getElementById('closePanelBtn').addEventListener('click', closePanel);
       els.backdrop.addEventListener('click', closePanel);
       document.getElementById('syncNowBtn').addEventListener('click', syncClock);
@@ -1209,11 +1163,15 @@
           closePanel();
           return;
         }
-        if (event.ctrlKey && event.shiftKey && (event.key === 'A' || event.key === 'a')) {
+        if (!els.panel.classList.contains('open') && (event.key === '1' || event.key === '2' || event.key === '3')) {
           event.preventDefault();
-          if (els.panel.classList.contains('open')) closePanel(); else openPanel();
+          unlockSequence = (unlockSequence + event.key).slice(-3);
+          if (unlockSequence === '123') {
+            openPanel();
+          }
           return;
         }
+        unlockSequence = '';
         if (event.key === 'ArrowLeft') {
           event.preventDefault();
           jumpRelative(-1);
