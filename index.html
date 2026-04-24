@@ -532,7 +532,7 @@
   <input class="hidden-file" id="importFile" type="file" accept="application/json" />
 
   <script>
-    const DEFAULT_ADS = ['ads/ad1.png', 'ads/ad2.png', 'ads/ad3.png'];
+    const DEFAULT_ADS = ['ads/ad1.png', 'ads/ad2.png', 'ads/ad3.png', 'ads/ad4.png'];
     const STORAGE_KEY = 'mikeslaptopsads.settings.v3';
 
     const state = {
@@ -623,6 +623,10 @@
         if (Array.isArray(saved.playlist)) {
           const savedPlaylist = saved.playlist.filter((item) => typeof item === 'string' && item.trim());
           state.playlist = savedPlaylist.length ? savedPlaylist : [...DEFAULT_ADS];
+          const missingDefaults = DEFAULT_ADS.filter((ad) => !state.playlist.includes(ad));
+          if (missingDefaults.length) {
+            state.playlist.push(...missingDefaults);
+          }
         }
         if (Number.isFinite(saved.durationMs)) state.durationMs = clamp(saved.durationMs, 5000, 120000);
         if (typeof saved.paused === 'boolean') state.paused = saved.paused;
@@ -1042,6 +1046,10 @@
           if (Array.isArray(data.playlist)) {
             const playlist = data.playlist.filter((item) => typeof item === 'string' && item.trim());
             state.playlist = playlist.length ? playlist : [...DEFAULT_ADS];
+            const missingDefaults = DEFAULT_ADS.filter((ad) => !state.playlist.includes(ad));
+            if (missingDefaults.length) {
+              state.playlist.push(...missingDefaults);
+            }
           }
           if (Number.isFinite(data.durationMs)) state.durationMs = clamp(data.durationMs, 5000, 120000);
           if (typeof data.paused === 'boolean') state.paused = data.paused;
