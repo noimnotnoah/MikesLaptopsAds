@@ -2,1008 +2,1280 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Company Ads</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MikesLaptopsAds</title>
   <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050505;
+      --panel: rgba(12, 12, 14, 0.96);
+      --text: #f4f7fb;
+      --muted: #9aa4b2;
+      --accent: #52ffa8;
+      --warn: #ffca3a;
+      --danger: #ff5c77;
+      --border: rgba(255, 255, 255, 0.12);
+      --shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; }
+
     html, body {
       margin: 0;
-      padding: 0;
+      width: 100%;
       height: 100%;
-      background: #000000;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+    }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(82, 255, 168, 0.09), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(78, 161, 255, 0.08), transparent 28%),
+        var(--bg);
+    }
+
+    #viewer {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .slide-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 420ms ease, filter 180ms ease;
+      will-change: opacity;
+      background: #000;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .slide-layer.visible { opacity: 1; }
+
+    #hud {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      top: 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      pointer-events: auto;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--warn);
+      box-shadow: 0 0 12px currentColor;
+      flex: 0 0 auto;
+    }
+
+    .status-pill.synced .status-dot { background: var(--accent); color: var(--accent); }
+    .status-pill.local .status-dot { background: var(--warn); color: var(--warn); }
+    .status-pill.offline .status-dot { background: var(--danger); color: var(--danger); }
+
+    #hudRight {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .hud-chip {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      color: var(--muted);
+      pointer-events: auto;
+    }
+
+    .hud-chip strong { color: var(--text); font-weight: 600; }
+
+    #settingsButton {
+      appearance: none;
+      border: 1px solid rgba(82, 255, 168, 0.35);
+      background: linear-gradient(180deg, rgba(82, 255, 168, 0.22), rgba(82, 255, 168, 0.1));
+      color: #d9ffef;
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 12px;
+      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+      pointer-events: auto;
+    }
+
+    #settingsButton:hover { transform: translateY(-1px); border-color: rgba(82, 255, 168, 0.7); }
+    #settingsButton:active { transform: translateY(0); }
+
+    #panelBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.48);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+      z-index: 40;
+    }
+
+    #panelBackdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #controlPanel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(940px, 100vw);
+      height: 100vh;
+      transform: translateX(105%);
+      transition: transform 240ms ease;
+      z-index: 50;
+      background: linear-gradient(180deg, rgba(16, 16, 18, 0.98), rgba(8, 8, 10, 0.98));
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: -20px 0 60px rgba(0, 0, 0, 0.45);
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }
-    #slideshow {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+
+    #controlPanel.open { transform: translateX(0); }
+
+    .panel-header {
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       align-items: center;
-      justify-content: center;
-      background: #000000;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
     }
-    #slideshow img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      transition: opacity 0.5s ease-in-out;
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.15;
     }
-    #slideshow.paused {
-      border: 5px solid #ff0000;
+
+    .title-wrap p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
     }
-    #slideshow.fade img {
-      transition: opacity 1s ease-in-out;
-    }
-    #syncIndicator {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      padding: 10px 15px;
-      background: rgba(0, 0, 0, 0.8);
-      border-radius: 5px;
-      font-family: Arial, sans-serif;
-      font-size: 12px;
-      color: white;
-      z-index: 100;
-      border-left: 4px solid #666;
-    }
-    #syncIndicator.synced {
-      border-left-color: #00ff00;
-      color: #00ff00;
-    }
-    #syncIndicator.local {
-      border-left-color: #ffaa00;
-      color: #ffaa00;
-    }
-    #alarmFlash {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 40px 60px;
-      background: rgba(255, 0, 0, 0.9);
-      border: 4px solid #ffff00;
-      border-radius: 20px;
-      font-family: Arial, sans-serif;
-      font-size: 48px;
-      font-weight: bold;
-      color: #ffff00;
-      z-index: 2000;
-      text-align: center;
-      animation: flashBounce 0.6s ease-in-out;
-      box-shadow: 0 0 30px #ff0000, 0 0 60px #ffff00;
-      text-shadow: 0 0 20px #ffff00;
-    }
-    @keyframes flashBounce {
-      0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-      50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
-      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-    #alarmFlash.show {
+
+    .panel-actions {
       display: flex;
-      align-items: center;
-      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
-    #adminPanel {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.95);
-      z-index: 1000;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      font-family: Arial, sans-serif;
-      color: #00ff99;
-      padding: 20px;
-      overflow-y: auto;
-      overflow-x: hidden;
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
     }
-    #adminPanel.open {
-      display: flex;
-    }
-    #adminPanel h1 {
-      font-size: 32px;
-      margin: 0 0 20px 0;
-      color: #ff0000;
-      text-shadow: 0 0 10px #ff0000;
-    }
-    .admin-grid {
+
+    .btn:hover { transform: translateY(-1px); border-color: rgba(255, 255, 255, 0.22); }
+    .btn.primary { background: rgba(82, 255, 168, 0.16); border-color: rgba(82, 255, 168, 0.35); }
+    .btn.blue { background: rgba(78, 161, 255, 0.16); border-color: rgba(78, 161, 255, 0.35); }
+    .btn.warn { background: rgba(255, 202, 58, 0.15); border-color: rgba(255, 202, 58, 0.35); }
+    .btn.danger { background: rgba(255, 92, 119, 0.16); border-color: rgba(255, 92, 119, 0.35); }
+
+    .panel-body {
+      padding: 18px 22px 22px;
+      overflow: auto;
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      max-width: 1000px;
-      width: 100%;
+      gap: 16px;
     }
-    .admin-section {
-      background: rgba(0, 255, 153, 0.1);
-      border: 2px solid #00ff99;
-      border-radius: 8px;
-      padding: 15px;
-      color: #00ff99;
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
     }
-    .admin-section h2 {
-      margin: 0 0 10px 0;
-      font-size: 16px;
-      border-bottom: 1px solid #00ff99;
-      padding-bottom: 8px;
+
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: var(--shadow);
     }
-    .admin-row {
-      margin: 8px 0;
-      display: flex;
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+      color: #eaf2ff;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 140px 1fr auto;
       gap: 10px;
       align-items: center;
-      font-size: 12px;
+      margin-bottom: 10px;
     }
-    .admin-row label {
-      min-width: 100px;
-      color: #aaa;
-    }
-    .admin-row span {
-      color: #00ff99;
-      font-weight: bold;
-    }
-    .admin-row input {
-      width: 60px;
-      padding: 5px;
-      background: rgba(0, 255, 153, 0.1);
-      border: 1px solid #00ff99;
-      color: #00ff99;
-      border-radius: 4px;
-    }
-    .admin-btn {
-      background: #00ff99;
-      color: #000;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 12px;
-      margin: 5px;
-    }
-    .admin-btn:hover {
-      background: #00dd77;
-    }
-    .admin-btn[onclick*="Alarm"],
-    .admin-btn[onclick*="alarm"] {
-      color: #ffffff !important;
-      background: #ff0000 !important;
-    }
-    .admin-btn[onclick*="Alarm"]:hover,
-    .admin-btn[onclick*="alarm"]:hover {
-      background: #cc0000 !important;
-    }
-    #logViewer {
-      background: rgba(0, 0, 0, 0.5);
-      border: 1px solid #00ff99;
-      border-radius: 4px;
-      padding: 10px;
-      max-height: 150px;
-      overflow-y: auto;
-      font-size: 11px;
-      font-family: monospace;
-      color: #0f0;
-    }
-    .log-entry {
-      margin: 2px 0;
-    }
-    #adminClose {
-      font-size: 12px;
-      color: #666;
-      margin-top: 20px;
-    }
-    .slider-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+
+    .row:last-child { margin-bottom: 0; }
+
+    .label { color: var(--muted); font-size: 13px; }
+
+    input[type="number"], input[type="text"], select {
       width: 100%;
-    }
-    .slider-container input[type="range"] {
-      flex: 1;
-      height: 4px;
-      background: rgba(0, 255, 153, 0.3);
-      border-radius: 2px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      padding: 10px 12px;
       outline: none;
+      font: inherit;
     }
-    .slider-container input[type="range"]::-webkit-slider-thumb {
-      width: 15px;
-      height: 15px;
-      background: #00ff99;
-      cursor: pointer;
-      border-radius: 50%;
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
     }
-    .slider-container span {
-      min-width: 40px;
+
+    .value {
+      width: 70px;
       text-align: right;
+      color: #dbe7f7;
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
     }
-    #emergencyOverlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: #ff0000;
-      z-index: 500;
-      align-items: center;
-      justify-content: center;
-      font-size: 48px;
-      color: white;
-      font-weight: bold;
-      text-align: center;
-      padding: 20px;
-      animation: pulse 1s infinite;
-    }
-    #setupModal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.9);
-      z-index: 2000;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      color: #00ff99;
-      font-family: Arial, sans-serif;
-    }
-    #setupModal.show {
+
+    .inline-actions {
       display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }
-    #setupModal h1 {
-      font-size: 36px;
-      margin-bottom: 30px;
-      color: #ff0000;
-      text-shadow: 0 0 10px #ff0000;
+
+    #playlistList, #logList, #statsList {
+      display: grid;
+      gap: 8px;
     }
-    #setupModal p {
-      font-size: 18px;
-      margin-bottom: 20px;
-      color: #aaa;
+
+    .list-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    #setupModal input {
-      width: 300px;
+
+    .list-item.active {
+      border-color: rgba(82, 255, 168, 0.45);
+      background: rgba(82, 255, 168, 0.08);
+    }
+
+    .list-meta {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .list-meta strong {
+      font-size: 13px;
+      color: #f6fbff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .list-meta span {
+      font-size: 12px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tiny-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .tiny-actions .btn { padding: 8px 10px; font-size: 12px; border-radius: 9px; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
       padding: 12px;
-      font-size: 16px;
-      background: rgba(0, 255, 153, 0.1);
-      border: 2px solid #00ff99;
-      color: #00ff99;
-      border-radius: 4px;
-      margin-bottom: 20px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: center;
     }
-    #setupModal button {
-      background: #00ff99;
-      color: #000;
-      border: none;
-      padding: 12px 30px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 16px;
+
+    .stat strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 4px;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
     }
-    #setupModal button:hover {
-      background: #00dd77;
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
+
+    #logList {
+      max-height: 240px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .log-entry {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.35;
+      color: #cde8d9;
+      word-break: break-word;
+    }
+
+    #footerHint {
+      padding: 0 22px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin-top: auto;
+    }
+
+    .hidden-file {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 900px) {
+      #controlPanel { width: 100vw; }
+      .grid, .stats-grid { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+      .value { text-align: left; width: auto; }
+      #hud { flex-direction: column; align-items: stretch; }
+      #hudRight { justify-content: flex-start; }
     }
   </style>
 </head>
 <body>
-  <div id="syncIndicator" class="local">⚪ SYNCING...</div>
-  
-  <div id="alarmFlash"></div>
-  
-  <div id="emergencyOverlay"></div>
-  
-  <div id="slideshow">
-    <img id="slide" src="ads/ad1.png" alt="Ad" />
-  </div>
+  <main id="viewer" aria-label="Advertisement slideshow">
+    <img id="slideA" class="slide-layer visible" alt="Advertisement 1" />
+    <img id="slideB" class="slide-layer" alt="Advertisement 2" />
 
-  <div id="adminPanel">
-    <h1>🚀 SUPREME COMMANDER KIM JONG UN ADMIN PANEL 🚀</h1>
-    
-    <div class="admin-grid">
-      <div class="admin-section">
-        <h2>📊 System Status</h2>
-        <div class="admin-row">
-          <label>Sync Status:</label>
-          <span id="statusSync">🟡 Checking...</span>
-        </div>
-        <div class="admin-row">
-          <label>Latency:</label>
-          <span id="statusLatency">-ms</span>
-        </div>
-        <div class="admin-row">
-          <label>Current Slide:</label>
-          <span id="statusSlide">1/3</span>
-        </div>
-        <div class="admin-row">
-          <label>Server Time:</label>
-          <span id="statusTime">--:--:--</span>
-        </div>
+    <div id="hud">
+      <div id="syncBadge" class="status-pill local">
+        <span class="status-dot"></span>
+        <span id="syncText">Syncing clock…</span>
       </div>
 
-      <div class="admin-section">
-        <h2>⚙️ Slideshow Control</h2>
-        <div class="admin-row">
-          <label>Duration (s):</label>
-          <input type="number" id="durationInput" min="1" max="60" value="10">
-          <button class="admin-btn" onclick="updateDuration()">Apply</button>
-        </div>
-        <div class="admin-row">
-          <button class="admin-btn" onclick="prevSlide()">← Prev</button>
-          <button class="admin-btn" onclick="nextSlide()">Next →</button>
-        </div>
-        <div class="admin-row">
-          <button class="admin-btn" id="pauseBtn" onclick="togglePause()">⏸️ Pause</button>
-          <button class="admin-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
-        </div>
+      <div id="hudRight">
+        <div class="hud-chip"><strong id="slideLabel">1 / 3</strong> <span id="slideName">Loading…</span></div>
+        <div class="hud-chip"><strong id="clockLabel">--:--:--</strong> <span id="nextChangeLabel">next change in --</span></div>
+        <button id="settingsButton" type="button">Display settings</button>
       </div>
+    </div>
+  </main>
 
-      <div class="admin-section">
-        <h2>🎨 Display Settings</h2>
-        <div class="admin-row">
-          <label>Brightness:</label>
-          <div class="slider-container">
-            <input type="range" id="brightnessSlider" min="50" max="150" value="100" oninput="updateBrightness()">
-            <span id="brightnessValue">100%</span>
-          </div>
-        </div>
-        <div class="admin-row">
-          <label>Contrast:</label>
-          <div class="slider-container">
-            <input type="range" id="contrastSlider" min="50" max="150" value="100" oninput="updateContrast()">
-            <span id="contrastValue">100%</span>
-          </div>
-        </div>
-        <div class="admin-row">
-          <button class="admin-btn" onclick="toggleTransitions()">✨ Toggle Fade</button>
-          <button class="admin-btn" onclick="toggleAutoDim()">🌙 Auto-Dim</button>
-        </div>
+  <div id="panelBackdrop" aria-hidden="true"></div>
+
+  <aside id="controlPanel" aria-hidden="true">
+    <div class="panel-header">
+      <div class="title-wrap">
+        <h1>Display control panel</h1>
+        <p>30-second slideshow, synced by server time, with persistent local controls.</p>
       </div>
-
-      <div class="admin-section">
-        <h2>🔄 Sync & Network</h2>
-        <button class="admin-btn" onclick="manualSync()">Force Sync Now</button>
-        <button class="admin-btn" onclick="checkLatency()">Check Latency</button>
-      </div>
-
-      <div class="admin-section">
-        <h2>� Statistics</h2>
-        <div class="admin-row">
-          <label>Uptime:</label>
-          <span id="statusUptime">0s</span>
-        </div>
-        <div class="admin-row">
-          <label>Total Errors:</label>
-          <span id="statusErrors">0</span>
-        </div>
-        <div class="admin-row">
-          <label>Impressions:</label>
-          <span id="statusImpressions">0</span>
-        </div>
-        <div class="admin-row">
-          <label>Cycles:</label>
-          <span id="statusCycles">0</span>
-        </div>
-      </div>
-
-      <div class="admin-section">
-        <h2>🔧 Utilities</h2>
-        <button class="admin-btn" onclick="reloadPage()">🔄 Reload Page</button>
-        <button class="admin-btn" onclick="clearLogs()">Clear Logs</button>
-        <button class="admin-btn" onclick="exportLogs()">💾 Export Logs</button>
-        <button class="admin-btn" onclick="resetStats()">📊 Reset Stats</button>
-        <button class="admin-btn" onclick="clearServerConfig()" style="background: #ff6600;">⚙️ Reconfigure Server</button>
-        <button class="admin-btn" onclick="toggleSyncAlarm()" style="background: #ff0000; color: #ffffff;">🚨 Sync Alarm</button>
-      </div>
-
-      <div class="admin-section" style="grid-column: 1/-1;">
-        <h2>🚨 Emergency Broadcast</h2>
-        <div class="admin-row">
-          <input type="text" id="emergencyText" placeholder="Enter emergency message..." style="flex: 1; width: auto; min-width: 300px;">
-          <button class="admin-btn" onclick="toggleEmergency()">🔴 BROADCAST</button>
-        </div>
-      </div>
-
-      <div class="admin-section" style="grid-column: 1/-1;">
-        <h2>📝 System Log</h2>
-        <div id="logViewer"></div>
+      <div class="panel-actions">
+        <button class="btn" type="button" id="closePanelBtn">Close</button>
+        <button class="btn blue" type="button" id="fullscreenBtn">Fullscreen</button>
+        <button class="btn primary" type="button" id="syncNowBtn">Sync now</button>
       </div>
     </div>
 
-    <div id="adminClose">Press ESC to close | Type 123 to reopen</div>
-  </div>
+    <div class="panel-body">
+      <section class="grid">
+        <div class="card">
+          <h2>Playback</h2>
+          <div class="row">
+            <div class="label">State</div>
+            <div class="inline-actions">
+              <button class="btn primary" type="button" id="pauseBtn">Pause</button>
+              <button class="btn" type="button" id="prevBtn">Previous</button>
+              <button class="btn" type="button" id="nextBtn">Next</button>
+            </div>
+            <div></div>
+          </div>
+          <div class="row">
+            <div class="label">Duration</div>
+            <input id="durationRange" type="range" min="5" max="120" step="1" />
+            <div class="value"><span id="durationValue">30</span>s</div>
+          </div>
+          <div class="row">
+            <div class="label">Transition</div>
+            <div class="inline-actions">
+              <button class="btn" type="button" id="fadeBtn">Fade on</button>
+              <button class="btn" type="button" id="fitBtn">Fit: contain</button>
+            </div>
+            <div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Display tuning</h2>
+          <div class="row">
+            <div class="label">Brightness</div>
+            <input id="brightnessRange" type="range" min="50" max="150" step="1" />
+            <div class="value"><span id="brightnessValue">100</span>%</div>
+          </div>
+          <div class="row">
+            <div class="label">Contrast</div>
+            <input id="contrastRange" type="range" min="50" max="150" step="1" />
+            <div class="value"><span id="contrastValue">100</span>%</div>
+          </div>
+          <div class="row">
+            <div class="label">Auto night dim</div>
+            <div class="inline-actions">
+              <button class="btn" type="button" id="nightDimBtn">Off</button>
+              <button class="btn warn" type="button" id="resetDisplayBtn">Reset display</button>
+            </div>
+            <div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Playlist</h2>
+          <div class="row">
+            <div class="label">Add image</div>
+            <input id="customImageUrl" type="text" placeholder="Paste image URL or local path" />
+            <button class="btn primary" type="button" id="addImageBtn">Add</button>
+          </div>
+          <div class="inline-actions" style="margin-bottom: 12px;">
+            <button class="btn" type="button" id="resetPlaylistBtn">Reset playlist</button>
+            <button class="btn" type="button" id="exportBtn">Export settings</button>
+            <button class="btn" type="button" id="importBtn">Import settings</button>
+            <button class="btn danger" type="button" id="clearCustomBtn">Clear custom ads</button>
+          </div>
+          <div id="playlistList"></div>
+        </div>
+
+        <div class="card">
+          <h2>Status</h2>
+          <div class="stats-grid">
+            <div class="stat"><strong id="statUptime">0s</strong><span>Uptime</span></div>
+            <div class="stat"><strong id="statSlides">0</strong><span>Slide changes</span></div>
+            <div class="stat"><strong id="statSyncs">0</strong><span>Clock syncs</span></div>
+            <div class="stat"><strong id="statErrors">0</strong><span>Errors</span></div>
+          </div>
+          <div class="row" style="margin-top: 14px;">
+            <div class="label">Clock source</div>
+            <div id="clockSource" style="color: var(--text); font-size: 13px;">Server time</div>
+            <div></div>
+          </div>
+          <div class="row">
+            <div class="label">Offset</div>
+            <div id="offsetLabel" style="color: var(--text); font-size: 13px;">0 ms</div>
+            <div></div>
+          </div>
+          <div class="row">
+            <div class="label">Next update</div>
+            <div id="nextUpdateLabel" style="color: var(--text); font-size: 13px;">--</div>
+            <div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Event log</h2>
+          <div id="logList"></div>
+        </div>
+        <div class="card">
+          <h2>Maintenance</h2>
+          <div class="inline-actions" style="margin-bottom: 12px;">
+            <button class="btn blue" type="button" id="reloadAssetsBtn">Reload assets</button>
+            <button class="btn" type="button" id="clearSettingsBtn">Clear saved settings</button>
+            <button class="btn warn" type="button" id="resyncLayoutBtn">Rebuild panel</button>
+          </div>
+          <div id="statsList"></div>
+        </div>
+      </section>
+    </div>
+
+    <div id="footerHint">Shortcuts: Ctrl+Shift+A open/close panel, Esc close, arrows change slides, Space pause/resume, F fullscreen.</div>
+  </aside>
+
+  <input class="hidden-file" id="importFile" type="file" accept="application/json" />
 
   <script>
-    const images = [
-      "ads/ad1.png",
-      "ads/ad2.png",
-      "ads/ad3.png"
-    ];
-    
-    let currentIndex = 0;
-    let previousIndex = -1;
-    const slideElement = document.getElementById("slide");
-    const syncIndicator = document.getElementById("syncIndicator");
-    const adminPanel = document.getElementById("adminPanel");
-    const logViewer = document.getElementById("logViewer");
-    let slideDuration = 30000; // 30 seconds per slide
-    
-    let isCheckingEmergency = false;
-    
-    // Sync indicator display
-    const syncIndicatorElement = document.getElementById("syncIndicator");
-    
-    // Time sync variables
-    let serverTimeOffset = 0;
-    let syncedTime = false;
-    let lastSyncLatency = 0;
-    let currentAPI = ""; // Track which API is being used
-    let systemLog = [];
-    let keySequence = "";
-    
-    // Feature toggles and stats
-    let isPaused = false;
-    let fadeEnabled = false;
-    let autoDimEnabled = false;
-    let emergencyMode = false;
-    let syncAlarmEnabled = false; // Warning sound for sync failures
-    let alarmTestActive = false; // Track if 'A' key is held for alarm testing
-    let alarmTestInterval = null;
-    let currentAlarm = null; // Track current alarm playback
-    let brightness = 100;
-    let contrast = 100;
-    let startTime = Date.now();
-    let totalErrors = 0;
-    let totalImpressions = 0;
-    let totalCycles = 0;
-    
-    // Cross-tab communication for emergency broadcasts
-    const broadcastChannel = new BroadcastChannel('emergency_channel');
-    
-    broadcastChannel.onmessage = (event) => {
-      const overlay = document.getElementById("emergencyOverlay");
-      if (event.data.text) {
-        overlay.textContent = event.data.text;
-        overlay.style.display = "flex";
-        emergencyMode = true;
-        addLog("🚨 EMERGENCY (from another tab): " + event.data.text);
-      } else {
-        overlay.style.display = "none";
-        emergencyMode = false;
-      }
+    const DEFAULT_ADS = ['ads/ad1.png', 'ads/ad2.png', 'ads/ad3.png'];
+    const STORAGE_KEY = 'mikeslaptopsads.settings.v3';
+
+    const state = {
+      playlist: [...DEFAULT_ADS],
+      durationMs: 30000,
+      paused: false,
+      fadeEnabled: true,
+      fitMode: 'contain',
+      brightness: 100,
+      contrast: 100,
+      autoNightDim: true,
+      serverOffsetMs: 0,
+      syncStatus: 'syncing',
+      syncSource: 'server',
+      errorCount: 0,
+      syncCount: 0,
+      slideChanges: 0,
+      startTime: Date.now(),
+      activeIndex: 0,
+      visibleLayer: 0,
+      manualOverrideIndex: null,
+      manualOverrideUntil: 0,
+      logs: []
     };
 
-    function addLog(msg) {
-      const time = new Date().toLocaleTimeString();
-      systemLog.push("[" + time + "] " + msg);
-      if (systemLog.length > 50) systemLog.shift();
-      updateLogView();
-      console.log(msg);
+    const els = {
+      slideA: document.getElementById('slideA'),
+      slideB: document.getElementById('slideB'),
+      syncBadge: document.getElementById('syncBadge'),
+      syncText: document.getElementById('syncText'),
+      slideLabel: document.getElementById('slideLabel'),
+      slideName: document.getElementById('slideName'),
+      clockLabel: document.getElementById('clockLabel'),
+      nextChangeLabel: document.getElementById('nextChangeLabel'),
+      nextUpdateLabel: document.getElementById('nextUpdateLabel'),
+      offsetLabel: document.getElementById('offsetLabel'),
+      clockSource: document.getElementById('clockSource'),
+      playlistList: document.getElementById('playlistList'),
+      logList: document.getElementById('logList'),
+      statsList: document.getElementById('statsList'),
+      durationRange: document.getElementById('durationRange'),
+      durationValue: document.getElementById('durationValue'),
+      brightnessRange: document.getElementById('brightnessRange'),
+      brightnessValue: document.getElementById('brightnessValue'),
+      contrastRange: document.getElementById('contrastRange'),
+      contrastValue: document.getElementById('contrastValue'),
+      pauseBtn: document.getElementById('pauseBtn'),
+      fadeBtn: document.getElementById('fadeBtn'),
+      fitBtn: document.getElementById('fitBtn'),
+      nightDimBtn: document.getElementById('nightDimBtn'),
+      customImageUrl: document.getElementById('customImageUrl'),
+      statUptime: document.getElementById('statUptime'),
+      statSlides: document.getElementById('statSlides'),
+      statSyncs: document.getElementById('statSyncs'),
+      statErrors: document.getElementById('statErrors'),
+      panel: document.getElementById('controlPanel'),
+      backdrop: document.getElementById('panelBackdrop'),
+      settingsButton: document.getElementById('settingsButton')
+    };
+
+    const imageCache = new Map();
+    let tickTimer = null;
+    let syncTimer = null;
+
+    function log(message) {
+      const entry = `[${new Date().toLocaleTimeString()}] ${message}`;
+      state.logs.unshift(entry);
+      state.logs = state.logs.slice(0, 80);
+      renderLogs();
+      console.log(message);
     }
 
-    function updateLogView() {
-      if (logViewer) {
-        logViewer.innerHTML = systemLog.map(l => '<div class="log-entry">' + l + '</div>').join('');
-        logViewer.scrollTop = logViewer.scrollHeight;
-      }
+    function saveSettings() {
+      const payload = {
+        playlist: state.playlist,
+        durationMs: state.durationMs,
+        paused: state.paused,
+        fadeEnabled: state.fadeEnabled,
+        fitMode: state.fitMode,
+        brightness: state.brightness,
+        contrast: state.contrast,
+        autoNightDim: state.autoNightDim
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     }
 
-    // Play TERRIFYING alarm sound from MP3 file
-    function playAlarmSound(forcePlay = false) {
-      if (!syncAlarmEnabled && !forcePlay) return;
-      
-      // Stop previous alarm if still playing
-      if (currentAlarm) {
-        currentAlarm.pause();
-        currentAlarm.currentTime = 0;
-      }
-      
-      // Create and play the alarm MP3
-      currentAlarm = new Audio('syncalarm.mp3');
-      currentAlarm.volume = 1.0; // Maximum volume
-      currentAlarm.currentTime = 0; // Start from beginning
-      currentAlarm.play().catch(err => console.log("Alarm play failed:", err));
-      
-      if (forcePlay) {
-        addLog("🚨 ALARM TEST - Hold 'A' to continue - MAXIMUM VOLUME WARNING");
-      } else {
-        addLog("🚨 SYNC ALARM TRIGGERED - TERRIFYING ALERT - VOLUME AT MAXIMUM");
-      }
-    }
-    
-    // Start alarm testing (hold 'A' key)
-    function startAlarmTest() {
-      if (alarmTestActive) return;
-      alarmTestActive = true;
-      addLog("🚨 ALARM TEST STARTED - Hold 'A' to continue, release to stop");
-      
-      // Play immediately
-      playAlarmSound(true);
-      
-      // Play every 800ms while held
-      alarmTestInterval = setInterval(() => {
-        if (alarmTestActive) {
-          playAlarmSound(true);
-        }
-      }, 800);
-    }
-    
-    // Stop alarm testing (release 'A' key)
-    function stopAlarmTest() {
-      if (!alarmTestActive) return;
-      alarmTestActive = false;
-      if (alarmTestInterval) {
-        clearInterval(alarmTestInterval);
-        alarmTestInterval = null;
-      }
-      // Stop playing alarm immediately
-      if (currentAlarm) {
-        currentAlarm.pause();
-        currentAlarm.currentTime = 0;
-        currentAlarm = null;
-      }
-      addLog("✓ ALARM TEST STOPPED");
-    }
-
-    function updateStatusDisplay() {
-      const serverTime = getServerTime();
-      if (document.getElementById("statusTime")) {
-        document.getElementById("statusTime").textContent = new Date(serverTime).toLocaleTimeString();
-      }
-      if (document.getElementById("statusSlide")) {
-        document.getElementById("statusSlide").textContent = (currentIndex + 1) + "/3";
-      }
-      if (document.getElementById("statusSync")) {
-        document.getElementById("statusSync").textContent = syncedTime ? "🟢 SYNCED" : "🟡 LOCAL TIME";
-      }
-      if (document.getElementById("statusLatency")) {
-        document.getElementById("statusLatency").textContent = lastSyncLatency + "ms";
-      }
-      
-      // Update stats
-      const uptime = Math.floor((Date.now() - startTime) / 1000);
-      const hours = Math.floor(uptime / 3600);
-      const mins = Math.floor((uptime % 3600) / 60);
-      const secs = uptime % 60;
-      const uptimeStr = hours > 0 ? hours + "h " + mins + "m" : mins > 0 ? mins + "m " + secs + "s" : secs + "s";
-      
-      if (document.getElementById("statusUptime")) {
-        document.getElementById("statusUptime").textContent = uptimeStr;
-      }
-      if (document.getElementById("statusErrors")) {
-        document.getElementById("statusErrors").textContent = totalErrors;
-      }
-      if (document.getElementById("statusImpressions")) {
-        document.getElementById("statusImpressions").textContent = totalImpressions;
-      }
-      if (document.getElementById("statusCycles")) {
-        document.getElementById("statusCycles").textContent = totalCycles;
-      }
-    }
-
-    // Perfect millisecond sync using GitHub Pages server time
-    async function syncServerTime() {
-      const t0 = performance.now();
-      
+    function loadSettings() {
       try {
-        // Fetch with GET to get server time from response headers
-        const res = await Promise.race([
-          fetch(window.location.href + "?t=" + Date.now(), { 
-            method: "GET", 
-            cache: "no-store"
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved.playlist)) {
+          const savedPlaylist = saved.playlist.filter((item) => typeof item === 'string' && item.trim());
+          state.playlist = savedPlaylist.length ? savedPlaylist : [...DEFAULT_ADS];
+        }
+        if (Number.isFinite(saved.durationMs)) state.durationMs = clamp(saved.durationMs, 5000, 120000);
+        if (typeof saved.paused === 'boolean') state.paused = saved.paused;
+        if (typeof saved.fadeEnabled === 'boolean') state.fadeEnabled = saved.fadeEnabled;
+        if (saved.fitMode === 'contain' || saved.fitMode === 'cover') state.fitMode = saved.fitMode;
+        if (Number.isFinite(saved.brightness)) state.brightness = clamp(saved.brightness, 50, 150);
+        if (Number.isFinite(saved.contrast)) state.contrast = clamp(saved.contrast, 50, 150);
+        if (typeof saved.autoNightDim === 'boolean') state.autoNightDim = saved.autoNightDim;
+      } catch (error) {
+        state.errorCount += 1;
+        log(`Settings load failed: ${error.message}`);
+      }
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, Number(value)));
+    }
+
+    function currentTimeMs() {
+      return Date.now() + state.serverOffsetMs;
+    }
+
+    function scheduledIndex(now = currentTimeMs()) {
+      return Math.floor(now / state.durationMs) % state.playlist.length;
+    }
+
+    function activeIndex(now = currentTimeMs()) {
+      if (state.paused) return state.activeIndex;
+      if (state.manualOverrideIndex !== null && now < state.manualOverrideUntil) {
+        return state.manualOverrideIndex;
+      }
+      return scheduledIndex(now);
+    }
+
+    function preload(src) {
+      if (imageCache.has(src)) return imageCache.get(src);
+      const promise = new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(src);
+        img.onerror = () => reject(new Error(`Failed to load ${src}`));
+        img.src = src;
+      });
+      imageCache.set(src, promise);
+      return promise;
+    }
+
+    async function preloadPlaylist() {
+      const jobs = state.playlist.map((src) => preload(src).catch((error) => {
+        state.errorCount += 1;
+        log(error.message);
+        return null;
+      }));
+      await Promise.all(jobs);
+    }
+
+    function applyVisualSettings() {
+      const filter = `brightness(${state.brightness}%) contrast(${state.contrast}%)`;
+      els.slideA.style.filter = filter;
+      els.slideB.style.filter = filter;
+      els.slideA.style.objectFit = state.fitMode;
+      els.slideB.style.objectFit = state.fitMode;
+      els.slideA.style.transition = state.fadeEnabled ? 'opacity 420ms ease, filter 180ms ease' : 'none';
+      els.slideB.style.transition = state.fadeEnabled ? 'opacity 420ms ease, filter 180ms ease' : 'none';
+    }
+
+    async function displaySlide(index, immediate = false) {
+      index = ((index % state.playlist.length) + state.playlist.length) % state.playlist.length;
+      if (index === state.activeIndex && !immediate) return;
+
+      const incoming = state.visibleLayer === 0 ? els.slideB : els.slideA;
+      const outgoing = state.visibleLayer === 0 ? els.slideA : els.slideB;
+      const src = state.playlist[index];
+
+      try {
+        await preload(src);
+      } catch (error) {
+        state.errorCount += 1;
+        log(error.message);
+        return;
+      }
+
+      incoming.src = src;
+      incoming.alt = `Advertisement ${index + 1}`;
+      incoming.style.transition = immediate ? 'none' : (state.fadeEnabled ? 'opacity 420ms ease, filter 180ms ease' : 'none');
+      outgoing.style.transition = immediate ? 'none' : (state.fadeEnabled ? 'opacity 420ms ease, filter 180ms ease' : 'none');
+
+      if (immediate || !state.fadeEnabled) {
+        outgoing.classList.remove('visible');
+        incoming.classList.add('visible');
+        incoming.style.opacity = '1';
+        outgoing.style.opacity = '0';
+      } else {
+        requestAnimationFrame(() => {
+          incoming.style.opacity = '1';
+          outgoing.style.opacity = '0';
+          incoming.classList.add('visible');
+          outgoing.classList.remove('visible');
+        });
+      }
+
+      state.visibleLayer = state.visibleLayer === 0 ? 1 : 0;
+      state.activeIndex = index;
+      state.slideChanges += 1;
+      renderStatus();
+      renderPlaylist();
+      saveSettings();
+    }
+
+    function setSyncStatus(kind, text) {
+      els.syncBadge.classList.remove('synced', 'local', 'offline');
+      els.syncBadge.classList.add(kind);
+      els.syncText.textContent = text;
+    }
+
+    async function syncClock() {
+      const startedAt = performance.now();
+      try {
+        const response = await Promise.race([
+          fetch(`${location.href.split('#')[0]}?sync=${Date.now()}`, { method: 'HEAD', cache: 'no-store' }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timeout')), 5000))
         ]);
-        
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        
-        // Get server time from Date header
-        const dateHeader = res.headers.get('date');
-        if (!dateHeader) throw new Error("No date header in response");
-        
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const dateHeader = response.headers.get('date');
+        if (!dateHeader) throw new Error('Missing Date header');
+
         const serverMs = new Date(dateHeader).getTime();
-        if (isNaN(serverMs)) throw new Error("Invalid date in header");
-        
-        const localMs = Date.now();
-        const t1 = performance.now();
-        lastSyncLatency = Math.round(t1 - t0);
-        serverTimeOffset = serverMs - localMs;
-        syncedTime = true;
-        currentAPI = "GitHub Pages";
-        
-        addLog("✓ SYNCED to GitHub Pages - latency: " + lastSyncLatency + "ms - offset: " + serverTimeOffset + "ms");
-        syncIndicatorElement.className = "synced";
-        syncIndicatorElement.textContent = "🟢 GitHub Pages - " + lastSyncLatency + "ms";
-        return true;
-      } catch (err) {
-        addLog("✗ Sync failed: " + err.message);
-        syncIndicatorElement.className = "error";
-        syncIndicatorElement.textContent = "🔴 SYNC ERROR";
-        currentAPI = "";
-        totalErrors++;
-        
-        // Play horrific alarm if enabled
-        playAlarmSound();
-        
-        // Retry in 2 seconds
-        setTimeout(syncServerTime, 2000);
-        return false;
+        if (Number.isNaN(serverMs)) throw new Error('Invalid Date header');
+
+        const roundTrip = performance.now() - startedAt;
+        const localEstimate = Date.now() - roundTrip / 2;
+        state.serverOffsetMs = serverMs - localEstimate;
+        state.syncStatus = 'synced';
+        state.syncSource = 'server';
+        state.syncCount += 1;
+        setSyncStatus('synced', `Synced · ${Math.round(roundTrip)} ms`);
+        log(`Clock synced · offset ${Math.round(state.serverOffsetMs)} ms · latency ${Math.round(roundTrip)} ms`);
+      } catch (error) {
+        state.errorCount += 1;
+        state.syncStatus = 'local';
+        state.syncSource = 'local';
+        setSyncStatus('local', 'Local clock fallback');
+        log(`Clock sync failed: ${error.message}`);
+      }
+      renderStatus();
+    }
+
+    function updateOverlay() {
+      const now = currentTimeMs();
+      const idx = activeIndex(now);
+      const nextChangeAt = Math.ceil(now / state.durationMs) * state.durationMs;
+      const secondsLeft = Math.max(0, Math.ceil((nextChangeAt - now) / 1000));
+      const slideName = state.playlist[idx] ? state.playlist[idx].split('/').pop() : 'Unknown';
+
+      els.slideLabel.textContent = `${idx + 1} / ${state.playlist.length}`;
+      els.slideName.textContent = slideName;
+      els.clockLabel.textContent = new Date(now).toLocaleTimeString();
+      els.nextChangeLabel.textContent = state.paused ? 'paused' : `next change in ${secondsLeft}s`;
+      els.nextUpdateLabel.textContent = state.paused ? 'paused' : new Date(nextChangeAt).toLocaleTimeString();
+      els.offsetLabel.textContent = `${Math.round(state.serverOffsetMs)} ms`;
+      els.clockSource.textContent = state.syncSource === 'server' ? 'Server time' : 'Local fallback';
+
+      const activeNow = activeIndex(now);
+      if (!state.paused && activeNow !== state.activeIndex) {
+        displaySlide(activeNow);
       }
     }
 
-    function getServerTime() {
-      return Date.now() + serverTimeOffset;
+    function renderStatus() {
+      const uptime = Math.floor((Date.now() - state.startTime) / 1000);
+      const hours = Math.floor(uptime / 3600);
+      const minutes = Math.floor((uptime % 3600) / 60);
+      const seconds = uptime % 60;
+      const uptimeText = hours > 0 ? `${hours}h ${minutes}m` : minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+      els.statUptime.textContent = uptimeText;
+      els.statSlides.textContent = String(state.slideChanges);
+      els.statSyncs.textContent = String(state.syncCount);
+      els.statErrors.textContent = String(state.errorCount);
+      els.durationValue.textContent = String(Math.round(state.durationMs / 1000));
+      els.brightnessValue.textContent = String(state.brightness);
+      els.contrastValue.textContent = String(state.contrast);
+      els.pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+      els.fadeBtn.textContent = state.fadeEnabled ? 'Fade on' : 'Fade off';
+      els.fitBtn.textContent = `Fit: ${state.fitMode}`;
+      els.nightDimBtn.textContent = state.autoNightDim ? 'On' : 'Off';
+      els.syncBadge.classList.toggle('offline', state.syncSource === 'local' && state.syncStatus !== 'synced');
+      applyVisualSettings();
     }
 
-    function updateSlide() {
-      if (isPaused || emergencyMode) return;
-      
-      const serverTime = getServerTime();
-      const cycleTime = serverTime % (slideDuration * images.length);
-      const newIndex = Math.floor(cycleTime / slideDuration);
-      
-      if (newIndex !== currentIndex) {
-        // Fade effect
-        if (fadeEnabled) {
-          slideElement.style.opacity = "0";
-          setTimeout(() => {
-            currentIndex = newIndex;
-            slideElement.src = images[currentIndex];
-            slideElement.style.opacity = "1";
-          }, 500);
-        } else {
-          currentIndex = newIndex;
-          slideElement.src = images[currentIndex];
-        }
-        
-        totalImpressions++;
-        console.log("Slide", currentIndex + 1, "| Server time:", new Date(serverTime).toISOString());
-        
-        // Auto-dim at night (10pm - 6am)
-        if (autoDimEnabled) {
-          const hour = new Date(serverTime).getHours();
-          if (hour >= 22 || hour < 6) {
-            if (brightness > 70) {
-              brightness = 70;
-              updateBrightness();
-            }
-          }
-        }
-        
-        // Reload page when cycle completes (after showing all 3 ads)
-        if (previousIndex === 2 && currentIndex === 0) {
-          totalCycles++;
-          addLog("Cycle complete - reloading page");
-          setTimeout(() => location.reload(), 500);
-        }
-        
-        previousIndex = currentIndex;
+    function renderLogs() {
+      els.logList.innerHTML = state.logs.length
+        ? state.logs.map((entry) => `<div class="log-entry">${escapeHtml(entry)}</div>`).join('')
+        : '<div class="log-entry">No events yet.</div>';
+    }
+
+    function renderPlaylist() {
+      els.playlistList.innerHTML = state.playlist.map((src, index) => {
+        const isActive = index === state.activeIndex;
+        const isDefault = DEFAULT_ADS.includes(src) && index < DEFAULT_ADS.length;
+        return `
+          <div class="list-item ${isActive ? 'active' : ''}">
+            <div class="list-meta">
+              <strong>${index + 1}. ${escapeHtml(src.split('/').pop())}</strong>
+              <span>${escapeHtml(src)}${isDefault ? ' · default' : ' · custom'}</span>
+            </div>
+            <div class="tiny-actions">
+              <button class="btn" type="button" data-action="preview" data-index="${index}">Preview</button>
+              <button class="btn" type="button" data-action="up" data-index="${index}">↑</button>
+              <button class="btn" type="button" data-action="down" data-index="${index}">↓</button>
+              ${isDefault ? '' : `<button class="btn danger" type="button" data-action="remove" data-index="${index}">Remove</button>`}
+            </div>
+          </div>
+        `;
+      }).join('') || '<div class="log-entry">No ads in the playlist.</div>';
+    }
+
+    function renderStats() {
+      const now = currentTimeMs();
+      const nextBoundary = Math.ceil(now / state.durationMs) * state.durationMs;
+      const items = [
+        ['Duration', `${Math.round(state.durationMs / 1000)} s`],
+        ['Playlist', `${state.playlist.length} items`],
+        ['Mode', state.paused ? 'Paused' : 'Playing'],
+        ['Next tick', new Date(nextBoundary).toLocaleTimeString()]
+      ];
+      els.statsList.innerHTML = items.map(([label, value]) => `
+        <div class="list-item">
+          <div class="list-meta">
+            <strong>${escapeHtml(label)}</strong>
+            <span>${escapeHtml(String(value))}</span>
+          </div>
+          <div></div>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function setPaused(paused) {
+      state.paused = paused;
+      if (!paused) {
+        state.manualOverrideIndex = null;
+        state.manualOverrideUntil = 0;
       }
+      renderStatus();
+      saveSettings();
+      log(paused ? 'Slideshow paused' : 'Slideshow resumed');
     }
 
-    function prevSlide() {
-      currentIndex = (currentIndex - 1 + images.length) % images.length;
-      slideElement.src = images[currentIndex];
-      addLog("Manual slide change: " + (currentIndex + 1));
+    function jumpRelative(step) {
+      const next = ((state.activeIndex + step) % state.playlist.length + state.playlist.length) % state.playlist.length;
+      state.manualOverrideIndex = next;
+      state.manualOverrideUntil = currentTimeMs() + state.durationMs;
+      state.paused = false;
+      displaySlide(next, true);
+      renderStatus();
+      saveSettings();
+      log(`Manual slide jump to ${next + 1}`);
     }
 
-    function nextSlide() {
-      currentIndex = (currentIndex + 1) % images.length;
-      slideElement.src = images[currentIndex];
-      addLog("Manual slide change: " + (currentIndex + 1));
+    function updateDurationFromUi() {
+      state.durationMs = clamp(Number(els.durationRange.value) * 1000, 5000, 120000);
+      state.manualOverrideUntil = 0;
+      state.manualOverrideIndex = null;
+      renderStatus();
+      renderStats();
+      saveSettings();
+      log(`Duration set to ${Math.round(state.durationMs / 1000)} seconds`);
     }
 
-    function updateDuration() {
-      const input = document.getElementById("durationInput");
-      const newDuration = parseInt(input.value) * 1000;
-      if (newDuration >= 1000 && newDuration <= 60000) {
-        slideDuration = newDuration;
-        addLog("Slide duration changed to " + input.value + "s");
-      }
+    function toggleFade() {
+      state.fadeEnabled = !state.fadeEnabled;
+      renderStatus();
+      saveSettings();
+      log(`Fade ${state.fadeEnabled ? 'enabled' : 'disabled'}`);
     }
 
-    // Setup and config functions
-    function clearServerConfig() {
-      addLog("No server configuration needed");
+    function toggleFit() {
+      state.fitMode = state.fitMode === 'contain' ? 'cover' : 'contain';
+      renderStatus();
+      saveSettings();
+      log(`Fit mode set to ${state.fitMode}`);
     }
 
-    function manualSync() {
-      addLog("Manual sync requested...");
-      syncServerTime();
-    }
-
-    async function checkLatency() {
-      try {
-        const t0 = performance.now();
-        const response = await fetch(window.location.href, { method: "HEAD", cache: "no-store" });
-        const t1 = performance.now();
-        const latency = Math.round(t1 - t0);
-        lastSyncLatency = latency;
-        addLog("Latency check: " + latency + "ms");
-      } catch (err) {
-        addLog("Latency check failed: " + err.message);
-      }
-    }
-
-    function reloadPage() {
-      if (confirm("Reload page? This will restart the slideshow.")) {
-        addLog("Reloading page...");
-        setTimeout(() => location.reload(), 500);
-      }
-    }
-
-    function clearLogs() {
-      systemLog = [];
-      updateLogView();
-      addLog("Logs cleared");
-    }
-
-    function togglePause() {
-      isPaused = !isPaused;
-      const btn = document.getElementById("pauseBtn");
-      const slideshow = document.getElementById("slideshow");
-      if (isPaused) {
-        btn.textContent = "▶️ Resume";
-        slideshow.classList.add("paused");
-        addLog("Slideshow paused");
-      } else {
-        btn.textContent = "⏸️ Pause";
-        slideshow.classList.remove("paused");
-        addLog("Slideshow resumed");
-      }
-    }
-
-    function toggleFullscreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-        addLog("Entered fullscreen");
-      } else {
-        document.exitFullscreen();
-        addLog("Exited fullscreen");
-      }
+    function toggleNightDim() {
+      state.autoNightDim = !state.autoNightDim;
+      renderStatus();
+      saveSettings();
+      log(`Auto night dim ${state.autoNightDim ? 'enabled' : 'disabled'}`);
     }
 
     function updateBrightness() {
-      brightness = document.getElementById("brightnessSlider").value;
-      document.getElementById("brightnessValue").textContent = brightness + "%";
-      applyFilters();
+      state.brightness = clamp(els.brightnessRange.value, 50, 150);
+      renderStatus();
+      saveSettings();
     }
 
     function updateContrast() {
-      contrast = document.getElementById("contrastSlider").value;
-      document.getElementById("contrastValue").textContent = contrast + "%";
-      applyFilters();
+      state.contrast = clamp(els.contrastRange.value, 50, 150);
+      renderStatus();
+      saveSettings();
     }
 
-    function applyFilters() {
-      slideElement.style.filter = "brightness(" + brightness + "%) contrast(" + contrast + "%)";
+    function resetDisplay() {
+      state.brightness = 100;
+      state.contrast = 100;
+      state.autoNightDim = true;
+      renderStatus();
+      saveSettings();
+      log('Display tuning reset');
     }
 
-    function toggleTransitions() {
-      fadeEnabled = !fadeEnabled;
-      const slideshow = document.getElementById("slideshow");
-      if (fadeEnabled) {
-        slideshow.classList.add("fade");
-        addLog("Fade transitions enabled");
-      } else {
-        slideshow.classList.remove("fade");
-        slideElement.style.opacity = "1";
-        addLog("Fade transitions disabled");
+    async function addCustomImage() {
+      const value = els.customImageUrl.value.trim();
+      if (!value) return;
+      try {
+        await preload(value);
+        state.playlist.push(value);
+        els.customImageUrl.value = '';
+        saveSettings();
+        renderPlaylist();
+        renderStats();
+        log(`Added image: ${value}`);
+      } catch (error) {
+        state.errorCount += 1;
+        log(`Could not load image: ${value}`);
       }
+      renderStatus();
     }
 
-    function toggleAutoDim() {
-      autoDimEnabled = !autoDimEnabled;
-      addLog("Auto-dim " + (autoDimEnabled ? "enabled" : "disabled"));
+    function moveItem(index, direction) {
+      const next = index + direction;
+      if (next < 0 || next >= state.playlist.length) return;
+      const copy = [...state.playlist];
+      [copy[index], copy[next]] = [copy[next], copy[index]];
+      state.playlist = copy;
+      state.activeIndex = scheduledIndex();
+      saveSettings();
+      renderPlaylist();
+      log(`Moved item ${direction < 0 ? 'up' : 'down'}`);
     }
 
-    function showAlarmFlash() {
-      const flashElement = document.getElementById("alarmFlash");
-      const state = syncAlarmEnabled ? "🚨 ALARM ENABLED" : "⭕ ALARM DISABLED";
-      const color = syncAlarmEnabled ? "#ff0000" : "#ffff00";
-      const textColor = syncAlarmEnabled ? "#ffffff" : "#ffff00";
-      
-      flashElement.textContent = state;
-      flashElement.style.borderColor = color;
-      flashElement.style.color = textColor;
-      flashElement.style.textShadow = "0 0 20px " + textColor;
-      flashElement.style.boxShadow = "0 0 30px " + color + ", 0 0 60px " + color;
-      
-      flashElement.classList.remove("show");
-      flashElement.offsetHeight; // Force reflow to restart animation
-      flashElement.classList.add("show");
-      
-      // Hide flash after animation
-      setTimeout(() => {
-        flashElement.classList.remove("show");
-      }, 600);
-    }
-    
-    function toggleSyncAlarm() {
-      syncAlarmEnabled = !syncAlarmEnabled;
-      addLog("🚨 Sync alarm " + (syncAlarmEnabled ? "ENABLED - will play loud warning on sync failure" : "DISABLED"));
-      if (!syncAlarmEnabled && currentAlarm) {
-        currentAlarm.pause();
-        currentAlarm.currentTime = 0;
-        currentAlarm = null;
-      }
-      showAlarmFlash();
+    function removeItem(index) {
+      const src = state.playlist[index];
+      if (DEFAULT_ADS.includes(src)) return;
+      state.playlist.splice(index, 1);
+      if (!state.playlist.length) state.playlist = [...DEFAULT_ADS];
+      if (state.activeIndex >= state.playlist.length) state.activeIndex = 0;
+      saveSettings();
+      renderPlaylist();
+      renderStats();
+      log(`Removed ${src}`);
     }
 
-    function toggleEmergency() {
-      const overlay = document.getElementById("emergencyOverlay");
-      const text = document.getElementById("emergencyText").value;
-      
-      if (!emergencyMode && text.trim()) {
-        emergencyMode = true;
-        overlay.textContent = text;
-        overlay.style.display = "flex";
-        addLog("🚨 EMERGENCY MESSAGE DISPLAYED: " + text);
-        
-        // Broadcast to all tabs on this device
-        broadcastChannel.postMessage({ text: text });
-      } else {
-        emergencyMode = false;
-        overlay.style.display = "none";
-        addLog("✓ Emergency message cleared");
-        
-        // Clear message on all tabs
-        broadcastChannel.postMessage({ text: "" });
-      }
+    function previewItem(index) {
+      state.manualOverrideIndex = index;
+      state.manualOverrideUntil = currentTimeMs() + state.durationMs;
+      state.paused = false;
+      displaySlide(index, true);
+      renderStatus();
+      saveSettings();
+      log(`Previewing slide ${index + 1}`);
     }
 
-    // Check for emergency broadcasts from server (all devices poll for updates)
-    async function checkEmergencyBroadcast() {
-      // No server - emergency messages only work on this device
+    function resetPlaylist() {
+      state.playlist = [...DEFAULT_ADS];
+      imageCache.clear();
+      state.activeIndex = 0;
+      state.manualOverrideIndex = null;
+      state.manualOverrideUntil = 0;
+      preloadPlaylist().then(() => displaySlide(scheduledIndex(), true));
+      saveSettings();
+      renderPlaylist();
+      renderStats();
+      log('Playlist reset to default ads');
     }
 
-    function exportLogs() {
-      const logText = systemLog.join("\n");
-      const blob = new Blob([logText], { type: "text/plain" });
+    function clearCustomAds() {
+      state.playlist = state.playlist.filter((src) => DEFAULT_ADS.includes(src));
+      if (!state.playlist.length) state.playlist = [...DEFAULT_ADS];
+      imageCache.clear();
+      preloadPlaylist();
+      saveSettings();
+      renderPlaylist();
+      renderStats();
+      log('Custom ads cleared');
+    }
+
+    function exportSettings() {
+      const payload = {
+        playlist: state.playlist,
+        durationMs: state.durationMs,
+        paused: state.paused,
+        fadeEnabled: state.fadeEnabled,
+        fitMode: state.fitMode,
+        brightness: state.brightness,
+        contrast: state.contrast,
+        autoNightDim: state.autoNightDim
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = "slideshow-logs-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".txt";
+      a.download = `mikeslaptopsads-settings-${new Date().toISOString().slice(0, 19).replaceAll(':', '-')}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      addLog("Logs exported");
+      log('Settings exported');
     }
 
-    function resetStats() {
-      if (confirm("Reset all statistics?")) {
-        startTime = Date.now();
-        totalErrors = 0;
-        totalImpressions = 0;
-        totalCycles = 0;
-        addLog("Statistics reset");
-        updateStatusDisplay();
-      }
-    }
+    function importSettingsFile(file) {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const data = JSON.parse(String(reader.result || '{}'));
+          if (Array.isArray(data.playlist)) {
+            const playlist = data.playlist.filter((item) => typeof item === 'string' && item.trim());
+            state.playlist = playlist.length ? playlist : [...DEFAULT_ADS];
+          }
+          if (Number.isFinite(data.durationMs)) state.durationMs = clamp(data.durationMs, 5000, 120000);
+          if (typeof data.paused === 'boolean') state.paused = data.paused;
+          if (typeof data.fadeEnabled === 'boolean') state.fadeEnabled = data.fadeEnabled;
+          if (data.fitMode === 'contain' || data.fitMode === 'cover') state.fitMode = data.fitMode;
+          if (Number.isFinite(data.brightness)) state.brightness = clamp(data.brightness, 50, 150);
+          if (Number.isFinite(data.contrast)) state.contrast = clamp(data.contrast, 50, 150);
+          if (typeof data.autoNightDim === 'boolean') state.autoNightDim = data.autoNightDim;
 
-    // Keyboard handler
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        adminPanel.classList.remove("open");
-        keySequence = "";
-        return;
-      }
-
-      // Press 0 to force reload and resync
-      if (e.key === "0") {
-        addLog("Force reload triggered (key 0)");
-        location.reload();
-        return;
-      }
-
-      // Press F for fullscreen
-      if (e.key === "f" || e.key === "F") {
-        toggleFullscreen();
-        return;
-      }
-      
-      // Press T to toggle sync alarm and show state (only when admin panel is closed)
-      if ((e.key === "t" || e.key === "T") && !e.repeat && !adminPanel.classList.contains("open")) {
-        toggleSyncAlarm();
-        return;
-      }
-      
-      // Hold 'A' to test alarm sound
-      if ((e.key === "a" || e.key === "A") && !e.repeat) {
-        startAlarmTest();
-        return;
-      }
-
-      keySequence += e.key;
-      if (keySequence.indexOf("123") !== -1) {
-        adminPanel.classList.add("open");
-        updateStatusDisplay();
-        keySequence = "";
-      }
-
-      if (keySequence.length > 10) {
-        keySequence = keySequence.slice(-10);
-      }
-    });
-    
-    // Handle key release for alarm testing
-    document.addEventListener("keyup", (e) => {
-      // Release 'A' to stop alarm test
-      if (e.key === "a" || e.key === "A") {
-        stopAlarmTest();
-      }
-    });
-
-    // Initialize and start
-    function start() {
-      console.log("Initializing slideshow with", images.length, "images");
-      console.log("Slide duration:", slideDuration / 1000, "seconds");
-      
-      addLog("Slideshow started - syncing for millisecond precision");
-      
-      // Sync immediately on startup
-      syncServerTime();
-      
-      // Show initial slide immediately
-      updateSlide();
-      addLog("Slideshow initialized - " + images.length + " images, " + (slideDuration/1000) + "s per slide");
-      
-      // Update status display every 100ms
-      setInterval(() => {
-        updateSlide();
-        if (adminPanel.classList.contains("open")) {
-          updateStatusDisplay();
+          saveSettings();
+          imageCache.clear();
+          await preloadPlaylist();
+          renderStatus();
+          renderPlaylist();
+          renderStats();
+          displaySlide(scheduledIndex(), true);
+          log('Settings imported');
+        } catch (error) {
+          state.errorCount += 1;
+          log(`Import failed: ${error.message}`);
         }
-      }, 100);
-      
-      // Resync every 2 seconds for ultra-fast millisecond accuracy across all devices
-      setInterval(syncServerTime, 2000);
+      };
+      reader.readAsText(file);
     }
+
+    function clearSavedSettings() {
+      localStorage.removeItem(STORAGE_KEY);
+      log('Saved settings cleared');
+    }
+
+    function reloadAssets() {
+      imageCache.clear();
+      preloadPlaylist().then(() => {
+        displaySlide(activeIndex(), true);
+        log('Assets reloaded');
+      });
+    }
+
+    async function enterFullscreen() {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        await document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function openPanel() {
+      els.panel.classList.add('open');
+      els.backdrop.classList.add('open');
+      els.panel.setAttribute('aria-hidden', 'false');
+      els.backdrop.setAttribute('aria-hidden', 'false');
+      renderStats();
+      renderPlaylist();
+    }
+
+    function closePanel() {
+      els.panel.classList.remove('open');
+      els.backdrop.classList.remove('open');
+      els.panel.setAttribute('aria-hidden', 'true');
+      els.backdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    function rebuildPanel() {
+      renderStatus();
+      renderPlaylist();
+      renderLogs();
+      renderStats();
+      log('Panel rebuilt');
+    }
+
+    function handlePlaylistClick(event) {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const index = Number(button.dataset.index);
+      const action = button.dataset.action;
+      if (action === 'preview') previewItem(index);
+      if (action === 'up') moveItem(index, -1);
+      if (action === 'down') moveItem(index, 1);
+      if (action === 'remove') removeItem(index);
+    }
+
+    function bindEvents() {
+      els.settingsButton.addEventListener('click', openPanel);
+      document.getElementById('closePanelBtn').addEventListener('click', closePanel);
+      els.backdrop.addEventListener('click', closePanel);
+      document.getElementById('syncNowBtn').addEventListener('click', syncClock);
+      document.getElementById('fullscreenBtn').addEventListener('click', enterFullscreen);
+      els.pauseBtn.addEventListener('click', () => setPaused(!state.paused));
+      document.getElementById('prevBtn').addEventListener('click', () => jumpRelative(-1));
+      document.getElementById('nextBtn').addEventListener('click', () => jumpRelative(1));
+      els.durationRange.addEventListener('input', updateDurationFromUi);
+      document.getElementById('fadeBtn').addEventListener('click', toggleFade);
+      document.getElementById('fitBtn').addEventListener('click', toggleFit);
+      els.brightnessRange.addEventListener('input', updateBrightness);
+      els.contrastRange.addEventListener('input', updateContrast);
+      document.getElementById('nightDimBtn').addEventListener('click', toggleNightDim);
+      document.getElementById('resetDisplayBtn').addEventListener('click', resetDisplay);
+      document.getElementById('addImageBtn').addEventListener('click', addCustomImage);
+      els.customImageUrl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') addCustomImage();
+      });
+      document.getElementById('resetPlaylistBtn').addEventListener('click', resetPlaylist);
+      document.getElementById('exportBtn').addEventListener('click', exportSettings);
+      document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+      document.getElementById('importFile').addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (file) importSettingsFile(file);
+        event.target.value = '';
+      });
+      document.getElementById('clearCustomBtn').addEventListener('click', clearCustomAds);
+      document.getElementById('reloadAssetsBtn').addEventListener('click', reloadAssets);
+      document.getElementById('clearSettingsBtn').addEventListener('click', clearSavedSettings);
+      document.getElementById('resyncLayoutBtn').addEventListener('click', rebuildPanel);
+      els.playlistList.addEventListener('click', handlePlaylistClick);
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          closePanel();
+          return;
+        }
+        if (event.ctrlKey && event.shiftKey && (event.key === 'A' || event.key === 'a')) {
+          event.preventDefault();
+          if (els.panel.classList.contains('open')) closePanel(); else openPanel();
+          return;
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          jumpRelative(-1);
+          return;
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          jumpRelative(1);
+          return;
+        }
+        if (event.key === ' ') {
+          event.preventDefault();
+          setPaused(!state.paused);
+          return;
+        }
+        if (event.key === 'f' || event.key === 'F') {
+          enterFullscreen();
+        }
+      });
+    }
+
+    async function tick() {
+      updateOverlay();
+      renderStats();
+      if (state.autoNightDim) {
+        const hour = new Date(currentTimeMs()).getHours();
+        const dimmed = hour >= 22 || hour < 6;
+        if (dimmed && (state.brightness > 72 || state.contrast > 110)) {
+          state.brightness = 72;
+          state.contrast = 110;
+          renderStatus();
+          saveSettings();
+        }
+      }
+    }
+
+    async function start() {
+      loadSettings();
+      els.durationRange.value = String(Math.round(state.durationMs / 1000));
+      els.brightnessRange.value = String(state.brightness);
+      els.contrastRange.value = String(state.contrast);
+      renderStatus();
+      renderLogs();
+      renderStats();
+      bindEvents();
+      await preloadPlaylist();
+      displaySlide(scheduledIndex(), true);
+      setSyncStatus('local', 'Syncing clock…');
+      log('Slideshow ready');
+      await syncClock();
+      tickTimer = setInterval(tick, 250);
+      syncTimer = setInterval(syncClock, 5 * 60 * 1000);
+      tick();
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (tickTimer) clearInterval(tickTimer);
+      if (syncTimer) clearInterval(syncTimer);
+      saveSettings();
+    });
 
     start();
   </script>
 </body>
 </html>
-  <script>
-    // FIREBASE CONFIG - Replace these with your values from Firebase Console
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      databaseURL: "https://YOUR_PROJECT.firebaseio.com"
-    };
-    
-    // Initialize Firebase
-    let db;
-    try {
-      firebase.initializeApp(firebaseConfig);
-      db = firebase.database();
-      
-      // Listen for broadcast messages in real-time
-      db.ref('broadcast/message').on('value', (snapshot) => {
-        const message = snapshot.val();
-        if (message && message.text) {
-          // Display broadcast message
-          const overlay = document.getElementById("emergencyOverlay");
-          overlay.textContent = message.text;
-          overlay.style.display = "flex";
-          overlay.style.background = message.color || "#ff0000";
-          emergencyMode = true;
-          addLog("📡 BROADCAST RECEIVED: " + message.text);
-        }
-      });
-    } catch (err) {
-      console.log("Firebase not configured - broadcasts disabled. Set up Firebase to enable.");
-    }
-  </script>
-
-
